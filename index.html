@@ -418,6 +418,54 @@ const U={res:gl.getUniformLocation(prog,'u_res'),tex:gl.getUniformLocation(prog,
 // The full-screen moon pass writes straight RGBA into a transparent buffer.
 // Blending here would multiply the lunar edge alpha twice before Canvas export.
 gl.disable(gl.BLEND);
+	// Background shader – renders the export background with float precision + built-in dithering
+	const BG_FS=`
+	precision highp float;
+	uniform vec2 u_res;
+	uniform vec2 u_moonCenter;
+	uniform float u_seed;
+	float hash(vec2 p){return fract(sin(dot(p,vec2(127.1,311.7)))*43758.5453);}
+	vec3 linearGradient(float t){
+	  vec3 c0=vec3(0.054902,0.062745,0.078431);
+	  vec3 c1=vec3(0.031373,0.035294,0.047059);
+	  vec3 c2=vec3(0.050980,0.058824,0.074510);
+	  return t<0.43?mix(c0,c1,t/0.43):mix(c1,c2,(t-0.43)/0.57);
+	}
+	void main(){
+	  vec2 uv=gl_FragCoord.xy/u_res;
+	  float t=(uv.x+uv.y)*0.5;
+	  vec3 col=linearGradient(t);
+	  vec2 moonUv=(gl_FragCoord.xy-u_moonCenter)/u_res.y;
+	  float moonDist=length(moonUv);
+	  float ambientMask=1.0-smoothstep(220.0/u_res.y,1400.0/u_res.y,moonDist);
+	  if(ambientMask>0.0){
+	    float at=1.0-ambientMask;
+	    vec3 amb0=vec3(0.423529,0.435294,0.462745)*0.095;
+	    vec3 amb1=vec3(0.349020,0.364706,0.396078)*0.062;
+	    vec3 amb2=vec3(0.254902,0.270588,0.298039)*0.027;
+	    vec3 amb3=vec3(0.0);
+	    vec3 ambientAdd=at<0.48?mix(amb0,amb1,at/0.48):at<0.78?mix(amb1,amb2,(at-0.48)/0.30):mix(amb2,amb3,(at-0.78)/0.22);
+	    col=col+ambientAdd-col*ambientAdd;
+	  }
+	  float rimMask=1.0-smoothstep(680.0/u_res.y,1260.0/u_res.y,moonDist);
+	  if(rimMask>0.0){
+	    float rt=1.0-rimMask;
+	    vec3 rim0=vec3(0.521569,0.541176,0.576471)*0.015;
+	    vec3 rim1=vec3(0.486275,0.509804,0.549020)*0.022;
+	    vec3 rim2=vec3(0.403922,0.427451,0.466667)*0.014;
+	    vec3 rim3=vec3(0.309804,0.329412,0.360784)*0.006;
+	    vec3 rim4=vec3(0.0);
+	    vec3 rimAdd=rt<0.28?mix(rim0,rim1,rt/0.28):rt<0.58?mix(rim1,rim2,(rt-0.28)/0.30):rt<0.82?mix(rim2,rim3,(rt-0.58)/0.24):mix(rim3,rim4,(rt-0.82)/0.18);
+	    col=col+rimAdd-col*rimAdd;
+	  }
+	  float d1=hash(gl_FragCoord.xy+u_seed);
+	  float d2=hash(gl_FragCoord.xy+u_seed+0.5);
+	  float dither=(d1+d2-1.0)*6.0/255.0;
+	  col=clamp(col+dither,0.0,1.0);
+	  gl_FragColor=vec4(col,1.0);
+	}`;
+	const bgProg=gl.createProgram();gl.attachShader(bgProg,shader(gl.VERTEX_SHADER,VS));gl.attachShader(bgProg,shader(gl.FRAGMENT_SHADER,BG_FS));gl.linkProgram(bgProg);
+	const bgU={res:gl.getUniformLocation(bgProg,'u_res'),moonCenter:gl.getUniformLocation(bgProg,'u_moonCenter'),seed:gl.getUniformLocation(bgProg,'u_seed')};
 const tex=gl.createTexture();gl.bindTexture(gl.TEXTURE_2D,tex);gl.texParameteri(gl.TEXTURE_2D,gl.TEXTURE_WRAP_S,gl.CLAMP_TO_EDGE);gl.texParameteri(gl.TEXTURE_2D,gl.TEXTURE_WRAP_T,gl.CLAMP_TO_EDGE);gl.texParameteri(gl.TEXTURE_2D,gl.TEXTURE_MIN_FILTER,gl.LINEAR);gl.texParameteri(gl.TEXTURE_2D,gl.TEXTURE_MAG_FILTER,gl.LINEAR);gl.texImage2D(gl.TEXTURE_2D,0,gl.RGBA,1,1,0,gl.RGBA,gl.UNSIGNED_BYTE,new Uint8Array([160,160,160,255]));
 const im=new Image();im.onload=()=>{gl.bindTexture(gl.TEXTURE_2D,tex);gl.pixelStorei(gl.UNPACK_FLIP_Y_WEBGL,false);gl.texImage2D(gl.TEXTURE_2D,0,gl.RGBA,gl.RGBA,gl.UNSIGNED_BYTE,im);el('texStatus').textContent=t('textureReady',{width:im.naturalWidth,height:im.naturalHeight});renderCurrent()};im.src=EMBED_TEX;
 const heightTex=gl.createTexture();gl.bindTexture(gl.TEXTURE_2D,heightTex);gl.texParameteri(gl.TEXTURE_2D,gl.TEXTURE_WRAP_S,gl.REPEAT);gl.texParameteri(gl.TEXTURE_2D,gl.TEXTURE_WRAP_T,gl.CLAMP_TO_EDGE);gl.texParameteri(gl.TEXTURE_2D,gl.TEXTURE_MIN_FILTER,gl.LINEAR);gl.texParameteri(gl.TEXTURE_2D,gl.TEXTURE_MAG_FILTER,gl.LINEAR);gl.texImage2D(gl.TEXTURE_2D,0,gl.RGBA,1,1,0,gl.RGBA,gl.UNSIGNED_BYTE,new Uint8Array([128,128,128,255]));
@@ -604,20 +652,26 @@ function exportCoordinateLabel(){if(!state.locationName)return'';const ns=state.
 function exportTimeLabel(date){const p=localPartsForDate(date),clock=`${pad(p.hour)}:${pad(p.minute)}`,zone=state.autoTimeZone&&state.timeZone?state.timeZone:formatUtcOffset(state.tz);if(currentLang==='zh')return`${p.year}年${p.month}月${p.day}日  ${clock}  ·  ${zone}`;const month=new Intl.DateTimeFormat('en-US',{month:'long',timeZone:'UTC'}).format(new Date(Date.UTC(2000,p.month-1,1)));return`${month} ${p.day}, ${p.year}  ·  ${clock}  ·  ${zone}`}
 function exportFileName(date){const p=localPartsForDate(date),lat=Math.abs(state.lat).toFixed(2)+(state.lat>=0?'N':'S'),lon=Math.abs(state.lon).toFixed(2)+(state.lon>=0?'E':'W');return`real-moon-${p.year}${pad(p.month)}${pad(p.day)}-${pad(p.hour)}${pad(p.minute)}-${lat}-${lon}.png`}
 function seededRandom(seed){let value=seed>>>0;return()=>{value=(Math.imul(value,1664525)+1013904223)>>>0;return value/4294967296}}
-function paintExportBackground(ctx,date){
-  const size=2400,moonCenterX=1200,moonCenterY=1162;
-  const smallSize=400,s=smallSize/size,smx=moonCenterX*s,smy=moonCenterY*s;
-  const smallCanvas=document.createElement('canvas');smallCanvas.width=smallSize;smallCanvas.height=smallSize;
-  const sc=smallCanvas.getContext('2d');
-  const base=sc.createLinearGradient(0,0,smallSize,smallSize);base.addColorStop(0,'#0e1014');base.addColorStop(.43,'#08090c');base.addColorStop(1,'#0d0f13');sc.fillStyle=base;sc.fillRect(0,0,smallSize,smallSize);
-  sc.save();sc.globalCompositeOperation='screen';const ambient=sc.createRadialGradient(smx,smy,220*s,smx,smy,1400*s);ambient.addColorStop(0,'rgba(108,111,118,.095)');ambient.addColorStop(.48,'rgba(89,93,101,.062)');ambient.addColorStop(.78,'rgba(65,69,76,.027)');ambient.addColorStop(1,'rgba(10,11,14,0)');sc.fillStyle=ambient;sc.fillRect(0,0,smallSize,smallSize);const rim=sc.createRadialGradient(smx,smy,680*s,smx,smy,1260*s);rim.addColorStop(0,'rgba(133,138,147,.015)');rim.addColorStop(.28,'rgba(124,130,140,.022)');rim.addColorStop(.58,'rgba(103,109,119,.014)');rim.addColorStop(.82,'rgba(79,84,92,.006)');rim.addColorStop(1,'rgba(58,61,67,0)');sc.fillStyle=rim;sc.fillRect(0,0,smallSize,smallSize);sc.restore();
-  const seed=(Math.floor(date.getTime()/60000)^Math.round((state.lat+90)*10000)^Math.imul(Math.round((state.lon+180)*10000),31))>>>0;
-  const imgData=sc.getImageData(0,0,smallSize,smallSize),data=imgData.data,random=seededRandom(seed^0xa53c9e71);
-  for(let i=0;i<data.length;i+=4){const n=(random()-.5)*4;data[i]=Math.max(0,Math.min(255,data[i]+n));data[i+1]=Math.max(0,Math.min(255,data[i+1]+n));data[i+2]=Math.max(0,Math.min(255,data[i+2]+n))}
-  sc.putImageData(imgData,0,0);
-  ctx.drawImage(smallCanvas,0,0,size,size);
-  const random2=seededRandom(seed);ctx.save();for(let i=0;i<155;i++){const x=random2()*size,y=random2()*size,r=.55+random2()*1.75,a=.14+random2()*.42;ctx.fillStyle=`rgba(230,232,236,${a.toFixed(3)})`;ctx.beginPath();ctx.arc(x,y,r,0,TAU);ctx.fill()}ctx.restore();
-}
+let _bgCanvas=null,_bgGl=null,_bgProg=null,_bgBuf=null,_bgApos=null;
+	function paintExportBackground(ctx,date){
+	  const size=2400;
+	  if(!_bgGl){
+	    _bgCanvas=document.createElement('canvas');_bgCanvas.width=size;_bgCanvas.height=size;
+	    _bgGl=_bgCanvas.getContext('webgl',{alpha:false,antialias:false,preserveDrawingBuffer:true});
+	    if(!_bgGl){_bgGl=null;return}
+	    function bgShader(type,src){const s=_bgGl.createShader(type);_bgGl.shaderSource(s,src);_bgGl.compileShader(s);return s}
+	    _bgProg=_bgGl.createProgram();_bgGl.attachShader(_bgProg,bgShader(_bgGl.VERTEX_SHADER,VS));_bgGl.attachShader(_bgProg,bgShader(_bgGl.FRAGMENT_SHADER,BG_FS));_bgGl.linkProgram(_bgProg);_bgGl.useProgram(_bgProg);
+	    _bgBuf=_bgGl.createBuffer();_bgGl.bindBuffer(_bgGl.ARRAY_BUFFER,_bgBuf);_bgGl.bufferData(_bgGl.ARRAY_BUFFER,new Float32Array([-1,-1,1,-1,-1,1,-1,1,1,-1,1,1]),_bgGl.STATIC_DRAW);
+	    _bgApos=_bgGl.getAttribLocation(_bgProg,'a_pos');_bgGl.enableVertexAttribArray(_bgApos);_bgGl.vertexAttribPointer(_bgApos,2,_bgGl.FLOAT,false,0,0);
+	  }
+	  _bgGl.uniform2f(_bgGl.getUniformLocation(_bgProg,'u_res'),size,size);
+	  _bgGl.uniform2f(_bgGl.getUniformLocation(_bgProg,'u_moonCenter'),1200,1162);
+	  const seed=(Math.floor(date.getTime()/60000)^Math.round((state.lat+90)*10000)^Math.imul(Math.round((state.lon+180)*10000),31))>>>0;
+	  _bgGl.uniform1f(_bgGl.getUniformLocation(_bgProg,'u_seed'),seed);
+	  _bgGl.drawArrays(_bgGl.TRIANGLES,0,6);
+	  ctx.drawImage(_bgCanvas,0,0,size,size);
+	  const random=seededRandom(seed);ctx.save();for(let i=0;i<155;i++){const x=random()*size,y=random()*size,r=.55+random()*1.75,a=.14+random()*.42;ctx.fillStyle=`rgba(230,232,236,${a.toFixed(3)})`;ctx.beginPath();ctx.arc(x,y,r,0,TAU);ctx.fill()}ctx.restore();
+	}
 function paintExportTypography(ctx,date){
   const x=154,y=2180,location=exportLocationLabel(),coordinates=exportCoordinateLabel();ctx.save();ctx.fillStyle='rgba(157,189,226,.72)';ctx.fillRect(x,y-122,76,2);ctx.beginPath();ctx.arc(x+96,y-121,4,0,TAU);ctx.fill();ctx.fillStyle='rgba(232,239,248,.84)';ctx.font=currentLang==='zh'?'500 38px "PingFang SC","Noto Sans CJK SC",sans-serif':'500 38px "Helvetica Neue","Avenir Next",Arial,sans-serif';ctx.textBaseline='alphabetic';ctx.fillText(location,x,y-58);ctx.fillStyle='rgba(183,199,220,.68)';ctx.font=currentLang==='zh'?'300 26px "PingFang SC","Noto Sans CJK SC",sans-serif':'300 26px "Helvetica Neue","Avenir Next",Arial,sans-serif';ctx.fillText(exportTimeLabel(date),x,y);if(coordinates){ctx.fillStyle='rgba(141,161,190,.48)';ctx.font='300 20px "Helvetica Neue",Arial,sans-serif';ctx.fillText(coordinates,x,y+38)}ctx.restore();
 }
