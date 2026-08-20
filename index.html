@@ -74,7 +74,10 @@ body.simple-mode .stage{position:absolute;inset:0;width:100vw;height:100vh;heigh
   body:not(.simple-mode) .locationSection .coordGrid>div{min-width:0}
   body:not(.simple-mode) .locationSection .fieldLabel{font-size:clamp(9px,2.6vw,11px);white-space:nowrap}
   body:not(.simple-mode) .locationSection .locateCell .btn{min-width:0;min-height:35px;padding:8px clamp(7px,2.3vw,10px);font-size:clamp(10px,2.8vw,12px);white-space:nowrap}
-  body:not(.simple-mode) .timeGrid{grid-template-columns:minmax(0,1fr) minmax(64px,19%) auto;align-items:end;gap:6px}
+  body:not(.simple-mode) .timeGrid{grid-template-columns:minmax(0,1fr) 64px auto;align-items:end;gap:6px}
+  body:not(.simple-mode) .timeGrid>div:first-child{min-width:0;overflow:hidden;border-radius:11px;contain:layout paint}
+  body:not(.simple-mode) .utcOffsetField .fieldLabelWithInfo{gap:3px}
+  body:not(.simple-mode) .utcOffsetField .infoToggle{width:16px;height:16px}
   body:not(.simple-mode) .timeGrid .fieldLabel{overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-size:clamp(9px,2.5vw,11px)}
   body:not(.simple-mode) .timeGrid input{width:100%;min-width:0;min-inline-size:0;max-width:100%;max-inline-size:100%;overflow:hidden;padding-inline:clamp(5px,1.8vw,8px);font-size:clamp(10px,2.7vw,12px)}
   body:not(.simple-mode) .timeNowCell .btn{min-width:0;padding:8px clamp(6px,2vw,9px);font-size:clamp(9px,2.7vw,12px)}
