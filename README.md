@@ -17,11 +17,12 @@ https://bowenzh0519.github.io/moon-viewer/
 
 ## 更新方式
 
-本地开发文件位于上层目录 `moon_observer_v2.html`，修改后执行：
+本地开发文件位于上层目录 `moon_observer_v3.html`，修改并完成本地验证后执行：
 
 ```bash
-cp ../moon_observer_v2.html index.html
-git add index.html
+cp ../moon_observer_v3.html index.html
+cp -R ../moon_tiles_v3 ./moon_tiles_v3
+git add -- index.html moon_tiles_v3
 git commit -m "更新月相页面"
 git push
 ```
