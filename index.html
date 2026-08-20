@@ -229,7 +229,7 @@ const I18N={
 Object.assign(I18N.zh,{modeAstroOption:'真实天文模式',locationTitle:'观测地点',timeTitle:'观测时间与时间流速',metricsTitle:'当前真实观测量',eclipseTitle:'真实月食',occultTitle:'月掩星预报',minusFiveMinutes:'−5 分钟',plusFiveMinutes:'+5 分钟'});
 Object.assign(I18N.en,{modeAstroOption:'Astronomy mode',locationTitle:'Observer location',timeTitle:'Observation time and rate',metricsTitle:'Current observed values',eclipseTitle:'Real lunar eclipse',occultTitle:'Lunar occultations',minusFiveMinutes:'−5 minutes',plusFiveMinutes:'+5 minutes'});
 function t(key,vars={}){let value=(I18N[currentLang]&&I18N[currentLang][key])??I18N.zh[key]??key;return String(value).replace(/\{(\w+)\}/g,(_,name)=>vars[name]??'')}
-const glc=el('gl'),ov=el('overlay'),octx=ov.getContext('2d'),gl=glc.getContext('webgl',{alpha:true,antialias:true,premultipliedAlpha:false});
+const glc=el('gl'),ov=el('overlay'),octx=ov.getContext('2d'),gl=glc.getContext('webgl',{alpha:true,antialias:true,premultipliedAlpha:true});
 if(!gl){alert(t('webglUnavailable'));throw new Error('WebGL unavailable')}
 
 // ---------- Vector/matrix helpers ----------
@@ -414,13 +414,14 @@ void main(){
   float edgeFeather=max(.003,8.0/min(u_res.x,u_res.y));
   float edge=1.0-smoothstep(1.0-edgeFeather,1.0,sqrt(r2));
   float dd=u_dither*(fract(sin(dot(gl_FragCoord.xy,vec2(12.9898,78.233)))*43758.5453)-.5);
-  gl_FragColor=vec4(clamp(col+dd,0.0,1.0),edge);
+  vec3 edgeColor=clamp(col+dd,0.0,1.0)*edge;
+  gl_FragColor=vec4(edgeColor,edge);
 }`;
 function shader(type,src){const s=gl.createShader(type);gl.shaderSource(s,src);gl.compileShader(s);if(!gl.getShaderParameter(s,gl.COMPILE_STATUS))throw new Error(gl.getShaderInfoLog(s));return s}
 const prog=gl.createProgram();gl.attachShader(prog,shader(gl.VERTEX_SHADER,VS));gl.attachShader(prog,shader(gl.FRAGMENT_SHADER,FS));gl.linkProgram(prog);if(!gl.getProgramParameter(prog,gl.LINK_STATUS))throw new Error(gl.getProgramInfoLog(prog));gl.useProgram(prog);const buf=gl.createBuffer();gl.bindBuffer(gl.ARRAY_BUFFER,buf);gl.bufferData(gl.ARRAY_BUFFER,new Float32Array([-1,-1,1,-1,-1,1,-1,1,1,-1,1,1]),gl.STATIC_DRAW);const apos=gl.getAttribLocation(prog,'a_pos');gl.enableVertexAttribArray(apos);gl.vertexAttribPointer(apos,2,gl.FLOAT,false,0,0);
 const U={res:gl.getUniformLocation(prog,'u_res'),tex:gl.getUniformLocation(prog,'u_tex'),height:gl.getUniformLocation(prog,'u_height'),heightTexel:gl.getUniformLocation(prog,'u_heightTexel'),heightReady:gl.getUniformLocation(prog,'u_heightReady'),invM:gl.getUniformLocation(prog,'u_invM'),sun:gl.getUniformLocation(prog,'u_sun'),earth:gl.getUniformLocation(prog,'u_earth'),contrast:gl.getUniformLocation(prog,'u_contrast'),shadowCenter:gl.getUniformLocation(prog,'u_shadowCenter'),umbraRadius:gl.getUniformLocation(prog,'u_umbraRadius'),penumRadius:gl.getUniformLocation(prog,'u_penumRadius'),eclipseActive:gl.getUniformLocation(prog,'u_eclipseActive'),danjon:gl.getUniformLocation(prog,'u_danjon'),eclipseHdr:gl.getUniformLocation(prog,'u_eclipseHdr'),turquoise:gl.getUniformLocation(prog,'u_turquoise'),dither:gl.getUniformLocation(prog,'u_dither'),moonScale:gl.getUniformLocation(prog,'u_moonScale')};gl.enable(gl.BLEND);gl.blendFunc(gl.SRC_ALPHA,gl.ONE_MINUS_SRC_ALPHA);
-// The full-screen moon pass writes straight RGBA into a transparent buffer.
-// Blending here would multiply the lunar edge alpha twice before Canvas export.
+// The full-screen moon pass writes premultiplied RGBA into the page compositor.
+// Blending stays disabled because the shader has already applied edge alpha.
 gl.disable(gl.BLEND);
 	// Background shader – renders the export background with float precision + built-in dithering
 	const BG_FS=`
@@ -481,6 +482,9 @@ function glMat3RowToColumn(M){return new Float32Array([M[0],M[3],M[6],M[1],M[4],
 // ---------- UI state ----------
 const state={lang:'zh',uiMode:'simple',mode:'astro',lat:31.2304,lon:121.4737,locationName:{zh:'上海',en:'Shanghai'},featuredCityId:null,locating:false,tz:8,timeZone:'Asia/Shanghai',autoTimeZone:true,simDate:new Date(),running:false,speed:3600,earth:.080,contrast:1.20,danjon:3,eclipseHdr:true,belowHorizonTheory:false,lastLocationFromMap:false,free:{lon:3,lat:-2,rot:18,phase:55,beta:15}};
 let lastAstro=null,lastFrame=performance.now(),lastCalc=0;
+const moonStage=glc.parentElement;let moonCanvasResizeFrame=0;
+function resizeMoonCanvases(){cancelAnimationFrame(moonCanvasResizeFrame);moonCanvasResizeFrame=requestAnimationFrame(()=>{const rect=moonStage.getBoundingClientRect(),pixelRatio=Math.min(window.devicePixelRatio||1,2),width=Math.max(1,Math.round(rect.width*pixelRatio)),height=Math.max(1,Math.round(rect.height*pixelRatio));if(glc.width===width&&glc.height===height&&ov.width===width&&ov.height===height)return;glc.width=ov.width=width;glc.height=ov.height=height;renderCurrent()})}
+if(window.ResizeObserver)new ResizeObserver(resizeMoonCanvases).observe(moonStage);window.addEventListener('resize',resizeMoonCanvases,{passive:true});resizeMoonCanvases();
 function moonDebugValue(id){const node=el(id);return node&&!node.disabled?node.value||null:null}
 function moonDebugText(id){const value=el(id)?.textContent?.trim();return value&&value!=='—'?value:null}
 function buildMoonDebugSnapshot(){
