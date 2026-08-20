@@ -2,11 +2,11 @@
 
 > 从你所在的地点出发，在浏览器中观察此刻或任意时刻的真实月相、月面姿态与月球相关天象。
 
-[![在线体验](https://img.shields.io/badge/在线体验-GitHub%20Pages-24292f?logo=github)](https://bowenzh0519.github.io/moon-viewer/)
+[![在线体验](https://img.shields.io/badge/在线体验-GitHub%20Pages-24292f?logo=github)](https://moon-observer.github.io/moon-viewer/)
 [![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
 [![Astronomy Engine](https://img.shields.io/badge/Astronomy%20Engine-2.1.19-596b7a)](https://github.com/cosinekitty/astronomy)
 
-**在线地址：** https://bowenzh0519.github.io/moon-viewer/
+**在线地址：** https://moon-observer.github.io/moon-viewer/
 
 ## 项目简介
 
@@ -144,7 +144,7 @@ Astronomy Engine 上游项目将其核心天文位置计算目标描述为与权
 项目是静态网站，不需要构建工具。由于高清切片、浏览器安全策略和定位能力的限制，建议通过本地 HTTP 服务预览，而不是直接双击 `index.html`。
 
 ```bash
-git clone https://github.com/bowenzh0519/moon-viewer.git
+git clone https://github.com/moon-observer/moon-viewer.git
 cd moon-viewer
 python3 -m http.server 8000
 ```
@@ -205,4 +205,4 @@ git push origin main
 
 **MIT License 不会改变或覆盖第三方组件、数据集、地图服务、商标和素材原有的许可或使用条款。** 使用、再分发或商业发布这些内容时，请分别遵守上文列出的来源说明与对应条款。
 
-Copyright © 2026 bowenzh0519
+Copyright © 2026 moon-observer
