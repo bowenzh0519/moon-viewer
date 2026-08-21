@@ -795,14 +795,23 @@ const state={lang:'zh',uiMode:'simple',mode:'astro',lat:31.2304,lon:121.4737,loc
 let lastAstro=null,lastFrame=performance.now(),lastCalc=0;
 const stage=glc.parentElement,viewer=document.querySelector('.viewer');
 let exportRendering=false;
-function simpleMoonBaseCssSize(){const viewportHeight=window.innerHeight,reserved=clamp(viewportHeight*.12,84,126);return Math.max(1,Math.min(window.innerWidth*.96,viewportHeight-reserved,940))}
+function simpleMoonBaseCssSize(){
+  const viewportWidth=document.documentElement.clientWidth||window.innerWidth,viewportHeight=window.innerHeight,reserved=clamp(viewportHeight*.12,84,126),baseSize=Math.max(1,Math.min(viewportWidth*.96,viewportHeight-reserved,940));
+  if(state.uiMode!=='simple')return baseSize;
+  const dock=document.getElementById('visibleCityDock'),stageRect=stage.getBoundingClientRect();
+  if(!dock||!dock.getClientRects().length||stageRect.height<1)return baseSize;
+  const dockRect=dock.getBoundingClientRect(),centerY=stageRect.top+stageRect.height/2,lowerRadius=dockRect.top-centerY-14;
+  if(dockRect.top<=centerY||lowerRadius<=0)return baseSize;
+  const head=document.querySelector('.head'),headRect=head?.getBoundingClientRect(),upperEdge=headRect&&headRect.bottom>stageRect.top?headRect.bottom:stageRect.top,upperRadius=centerY-upperEdge-12;
+  return Math.max(1,Math.min(baseSize,lowerRadius/.44,upperRadius>0?upperRadius/.44:baseSize))
+}
 function moonViewCssSize(){const rect=stage.getBoundingClientRect();return state.uiMode==='simple'?simpleMoonBaseCssSize():Math.max(1,Math.min(rect.width,rect.height))}
 let interfaceModeMoonPixelSize=0;
 function moonViewPixelSize(){if(exportRendering)return Math.max(1,Math.min(glc.width,glc.height));if(interfaceModeMoonPixelSize>0)return interfaceModeMoonPixelSize;const rect=stage.getBoundingClientRect(),scale=Math.min(glc.width/Math.max(1,rect.width),glc.height/Math.max(1,rect.height));return moonViewCssSize()*scale}
 let canvasResizeFrame=0,interfaceModeCanvasResizeLocked=false;
 function resizeMoonCanvasesNow(){const rect=stage.getBoundingClientRect(),cssWidth=stage.offsetWidth||rect.width,cssHeight=stage.offsetHeight||rect.height,pixelRatio=Math.min(window.devicePixelRatio||1,2),width=Math.max(1,Math.round(cssWidth*pixelRatio)),height=Math.max(1,Math.round(cssHeight*pixelRatio));if(glc.width===width&&glc.height===height&&ov.width===width&&ov.height===height)return false;glc.width=ov.width=width;glc.height=ov.height=height;invalidateTilePlans();return true}
 function resizeMoonCanvases(){cancelAnimationFrame(canvasResizeFrame);canvasResizeFrame=requestAnimationFrame(()=>{canvasResizeFrame=0;if(interfaceModeCanvasResizeLocked)return;if(resizeMoonCanvasesNow())renderCurrent()})}
-if(window.ResizeObserver)new ResizeObserver(resizeMoonCanvases).observe(stage);window.addEventListener('resize',resizeMoonCanvases,{passive:true});
+if(window.ResizeObserver){new ResizeObserver(resizeMoonCanvases).observe(stage);const cityDock=document.getElementById('visibleCityDock');if(cityDock)new ResizeObserver(()=>{if(state.uiMode==='simple'){invalidateTilePlans();renderCurrent()}}).observe(cityDock)}window.addEventListener('resize',resizeMoonCanvases,{passive:true});
 let mobileProLayoutFrame=0;
 function updateMobileProfessionalLayout(){
   mobileProLayoutFrame=0;const active=state.uiMode==='advanced'&&window.matchMedia('(max-width:760px)').matches;
