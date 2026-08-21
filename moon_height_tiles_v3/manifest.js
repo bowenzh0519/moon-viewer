@@ -1,0 +1,1 @@
+window.MOON_HEIGHT_TILE_MANIFEST={"version":1,"projection":"equirectangular","tileSize":512,"border":2,"format":"png","encoding":"uint16-la-low-high","levels":[{"width":8192,"height":4096,"columns":16,"rows":8,"path":"8192/{x}_{y}.png"},{"width":16384,"height":8192,"columns":32,"rows":16,"path":"16384/{x}_{y}.png"}]};
