@@ -428,9 +428,10 @@ vec3 surfaceColor(vec2 uv){
   if(u_tileActive<.5)return base;
   vec2 wrapped=vec2(fract(uv.x),clamp(uv.y,0.0,.999999));
   vec2 tile=floor(wrapped*u_tileGrid);
-  float slotByte=floor(texture2D(u_tilePage,(tile+.5)/u_tileGrid).r*255.0+.5);
-  if(slotByte<1.0)return base;
-  float slot=slotByte-1.0;
+  vec4 pageEntry=texture2D(u_tilePage,(tile+.5)/u_tileGrid);
+  float slotCode=floor(pageEntry.r*255.0+.5)+256.0*floor(pageEntry.g*255.0+.5);
+  if(slotCode<1.0)return base;
+  float slot=slotCode-1.0;
   vec2 atlasCell=vec2(mod(slot,u_tileAtlasGrid.x),floor(slot/u_tileAtlasGrid.x));
   vec2 local=fract(wrapped*u_tileGrid);
   vec2 atlasPixel=atlasCell*u_tileStoredSize+vec2(u_tileBorder)+local*(u_tileStoredSize-2.0*u_tileBorder);
@@ -678,9 +679,10 @@ function resetTileLevel(level){
 }
 function tileKey(level,x,y){return `${level.width}:${x}:${y}`}
 function tilePath(level,x,y){return `moon_tiles_v3_256/${level.path.replace('{x}',x).replace('{y}',y)}`}
+function setTilePageSlot(level,x,y,slot){const index=(y*level.columns+x)*4,code=slot+1;tileRuntime.pageData[index]=code&255;tileRuntime.pageData[index+1]=(code>>>8)&255}
 function clearTilePage(entry){
   if(!entry||!tileRuntime.level||entry.level!==tileRuntime.level.width)return;
-  const index=(entry.y*tileRuntime.level.columns+entry.x)*4;tileRuntime.pageData[index]=0;
+  const index=(entry.y*tileRuntime.level.columns+entry.x)*4;tileRuntime.pageData[index]=0;tileRuntime.pageData[index+1]=0;
 }
 function allocateTileSlot(){
   let slot=tileRuntime.slots.indexOf(null);
@@ -703,7 +705,7 @@ function finishTileLoad(task,image,generation){
   if(slot>=0){
     const axis=tileRuntime.atlasAxis,x=slot%axis,y=Math.floor(slot/axis),entry={...task,slot,used:performance.now()};
     try{gl.bindTexture(gl.TEXTURE_2D,tileAtlas);gl.pixelStorei(gl.UNPACK_FLIP_Y_WEBGL,false);discardPendingGlErrors();gl.texSubImage2D(gl.TEXTURE_2D,0,x*tileRuntime.storedSize,y*tileRuntime.storedSize,gl.RGBA,gl.UNSIGNED_BYTE,image);const uploadError=gl.getError();if(uploadError!==gl.NO_ERROR)throw new Error(`WebGL ${uploadError}`)}catch(error){tileRuntime.failures++;tileRuntime.lastError=`${location.protocol} ${error?.name||'TileUploadError'}: ${error?.message||error}`;uploadTilePage();renderCurrent();queueTileRetry(task,generation,pumpTileQueue,tileRuntime);pumpTileQueue();updateTileReadout();return}
-    tileRuntime.slots[slot]=entry;tileRuntime.loaded.set(task.key,entry);const pageIndex=(task.y*task.level.columns+task.x)*4;tileRuntime.pageData[pageIndex]=slot+1;uploadTilePage();renderCurrent();
+    tileRuntime.slots[slot]=entry;tileRuntime.loaded.set(task.key,entry);setTilePageSlot(task.level,task.x,task.y,slot);uploadTilePage();renderCurrent();
   }
   pumpTileQueue();
 }
