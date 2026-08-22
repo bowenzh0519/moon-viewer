@@ -655,12 +655,22 @@ function queueTileRetry(task,generation,pump,runtime){
   },120*attempt);
 }
 
+function allocateTileAtlasStorage(texture,storedSize,preferredAxis){
+  const maxAxis=Math.min(preferredAxis,Math.floor(gl.getParameter(gl.MAX_TEXTURE_SIZE)/storedSize));
+  gl.bindTexture(gl.TEXTURE_2D,texture);
+  for(let axis=maxAxis;axis>=2;axis--){
+    discardPendingGlErrors();
+    gl.texImage2D(gl.TEXTURE_2D,0,gl.RGBA,storedSize*axis,storedSize*axis,0,gl.RGBA,gl.UNSIGNED_BYTE,null);
+    if(gl.getError()===gl.NO_ERROR)return axis;
+  }
+  return 0;
+}
+
 function initTileRuntime(){
   if(!tileManifest?.levels?.length)return;
-  const storedSize=tileManifest.tileSize+2*tileManifest.border,maxTexture=gl.getParameter(gl.MAX_TEXTURE_SIZE),atlasAxis=Math.min(18,Math.floor(maxTexture/storedSize));
+  const storedSize=tileManifest.tileSize+2*tileManifest.border,constrainedDevice=window.matchMedia('(max-width:760px),(pointer:coarse)').matches,atlasAxis=allocateTileAtlasStorage(tileAtlas,storedSize,constrainedDevice?18:22);
   if(atlasAxis<2)return;
   tileRuntime.storedSize=storedSize;tileRuntime.atlasAxis=atlasAxis;tileRuntime.slotCount=atlasAxis*atlasAxis;tileRuntime.slots=new Array(tileRuntime.slotCount).fill(null);tileRuntime.ready=true;
-  gl.bindTexture(gl.TEXTURE_2D,tileAtlas);gl.texImage2D(gl.TEXTURE_2D,0,gl.RGBA,storedSize*atlasAxis,storedSize*atlasAxis,0,gl.RGBA,gl.UNSIGNED_BYTE,null);
 }
 initTileRuntime();
 
@@ -681,7 +691,7 @@ function tileKey(level,x,y){return `${level.width}:${x}:${y}`}
 function tilePath(level,x,y){return `moon_tiles_v3_256/${level.path.replace('{x}',x).replace('{y}',y)}`}
 function setTilePageSlot(level,x,y,slot){const index=(y*level.columns+x)*4,code=slot+1;tileRuntime.pageData[index]=code&255;tileRuntime.pageData[index+1]=(code>>>8)&255}
 function clearTilePage(entry){
-  if(!entry||!tileRuntime.level||entry.level!==tileRuntime.level.width)return;
+  if(!entry||!tileRuntime.level||entry.level?.width!==tileRuntime.level.width)return;
   const index=(entry.y*tileRuntime.level.columns+entry.x)*4;tileRuntime.pageData[index]=0;tileRuntime.pageData[index+1]=0;
 }
 function allocateTileSlot(){
@@ -743,10 +753,9 @@ const heightTileRuntime={ready:false,level:null,storedSize:1,atlasAxis:1,slotCou
 
 function initHeightTileRuntime(){
   if(!heightTileManifest?.levels?.length||gl.getParameter(gl.MAX_TEXTURE_IMAGE_UNITS)<6)return;
-  const storedSize=heightTileManifest.tileSize+2*heightTileManifest.border,maxTexture=gl.getParameter(gl.MAX_TEXTURE_SIZE),atlasAxis=Math.min(10,Math.floor(maxTexture/storedSize));
+  const storedSize=heightTileManifest.tileSize+2*heightTileManifest.border,constrainedDevice=window.matchMedia('(max-width:760px),(pointer:coarse)').matches,atlasAxis=allocateTileAtlasStorage(heightTileAtlas,storedSize,constrainedDevice?10:13);
   if(atlasAxis<2)return;
   heightTileRuntime.storedSize=storedSize;heightTileRuntime.atlasAxis=atlasAxis;heightTileRuntime.slotCount=atlasAxis*atlasAxis;heightTileRuntime.slots=new Array(heightTileRuntime.slotCount).fill(null);heightTileRuntime.ready=true;
-  gl.bindTexture(gl.TEXTURE_2D,heightTileAtlas);gl.texImage2D(gl.TEXTURE_2D,0,gl.RGBA,storedSize*atlasAxis,storedSize*atlasAxis,0,gl.RGBA,gl.UNSIGNED_BYTE,null);
 }
 initHeightTileRuntime();
 
@@ -765,7 +774,7 @@ function resetHeightTileLevel(level){
 }
 function heightTilePath(level,x,y){return `moon_height_tiles_v3/${level.path.replace('{x}',x).replace('{y}',y)}`}
 function clearHeightTilePage(entry){
-  if(!entry||!heightTileRuntime.level||entry.level!==heightTileRuntime.level.width)return;
+  if(!entry||!heightTileRuntime.level||entry.level?.width!==heightTileRuntime.level.width)return;
   const index=(entry.y*heightTileRuntime.level.columns+entry.x)*4;heightTileRuntime.pageData[index]=0;
 }
 function allocateHeightTileSlot(){
