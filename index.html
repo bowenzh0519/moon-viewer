@@ -141,8 +141,9 @@ body.simple-mode .cityDock{z-index:30}
 body.simple-mode .exportDock{z-index:31}
 @media(max-width:760px){
   body.simple-mode .cityDock{display:flex!important;box-sizing:border-box;width:calc(100vw - 16px);max-width:none;align-items:stretch}
-  body.simple-mode .visibleCityButtons{display:flex!important;flex:1 1 0;width:0;min-width:0;overflow-x:auto;overflow-y:hidden;visibility:visible;opacity:1}
-  body.simple-mode .visibleCityButton{display:block!important;flex:0 0 auto;visibility:visible;opacity:1}
+  body.simple-mode .visibleCityButtons{display:flex!important;flex:1 1 0;width:0;min-width:0;overflow:hidden;visibility:visible;opacity:1}
+  body.simple-mode .visibleCityButton{display:block!important;flex:1 1 0;min-width:0;visibility:visible;opacity:1}
+  body.simple-mode .visibleCityButton:nth-child(n+4){display:none!important}
   body.simple-mode .cityMoreButton{flex:0 0 68px}
 }
 @keyframes simplePresentationRefresh{from{opacity:.9999}to{opacity:1}}
